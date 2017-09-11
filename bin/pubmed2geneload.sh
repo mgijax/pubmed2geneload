@@ -77,6 +77,8 @@ else
     echo "Environment variable DLAJOBSTREAMFUNC has not been defined." | tee -a ${LOG}
     exit 1
 fi
+echo ${MGD_DBSERVER}
+echo ${MGD_DBNAME}
 
 #####################################
 #
@@ -92,7 +94,7 @@ preload ${OUTPUTDIR}
 #
 # Create associations in the database
 #
-echo "Creating Gene Summary association load input file" >> ${LOG_DIAG}
+echo "Creating PubMed to Gene Associations" >> ${LOG_DIAG}
 ${PUBMED2GENELOAD}/bin/pubmed2geneload.py >> ${LOG_DIAG}
 STAT=$?
 checkStatus ${STAT} "pubmed2geneload.py"
