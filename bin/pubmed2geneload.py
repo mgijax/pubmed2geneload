@@ -117,7 +117,7 @@ inputPmIdNotInMgiList = [] # 1 PM ID not in the database
 inputPmIdMultiEgList = [] # 2 Reference Associated with > 15 egID in input
 inputEgIdNotInMgiList =  [] # 3 EG ID not in the database  
 egIdMultiGenesList = [] # 4 EG ID associated with < 1 marker in database
-
+dOrRStatusList = [] # 5 current status is discard or rejected
 def init():
     global dbPmToMgiDict, inputPmToEgDict, dbEgToMarkerDict, curRefDict
     global refAssocKey, fpBcp, fpLogCur, fpLogDiag, totalAssoc
@@ -362,7 +362,7 @@ def bcpFiles():
 # Throws:   nothing
 
 def updateGoStatus():
-    global refList
+    global refList, dOrRStatusList
     # for all reference associations we are creating:
     # create lookup to check existing GO group status - 
     # 	if it is 'rejected' or 'discard', report
@@ -382,9 +382,14 @@ def updateGoStatus():
 	    statusKey = infoList[1]
 	    if isDiscard == 1 or statusKey == 31576672: # rejected
 		# report
-		print 'reporting isDiscard: %s, statusKey: %s' % (isDiscard, statusKey)
+		d = 'False'
+		s = 'Not Rejected'
+		if isDiscard == 1:
+		    d = 'True'
+		if statusKey == 31576672:
+		    s = 'Rejected'
+		dOrRStatusList.append('%s%s%s%s%s' % (refID, TAB, d, TAB, s))
 		continue
-
 	    if statusKey != 31576674:
 		updateStatusList.append(refID)
 	else:
@@ -452,6 +457,13 @@ def writeCuratorLog():
              ('EG ID','PM ID', 'Markers', CRT))
 	fpLogCur.write(string.join(egIdMultiGenesList, CRT))
 	fpLogCur.write(CRT + 'Total: %s' % len(egIdMultiGenesList))
+    if len(dOrRStatusList):
+	fpLogCur.write(CRT + CRT + string.center(
+            'Reference with isDiscard=true or Status=Rejected',60) + CRT)
+        fpLogCur.write('%-12s  %-20s  %-20s%s' %
+             ('Reference ID','isDiscard', 'Status', CRT))
+        fpLogCur.write(string.join(dOrRStatusList, CRT))
+        fpLogCur.write(CRT + 'Total: %s' % len(dOrRStatusList))
     return 0
 #
 # Purpose: Close files.
