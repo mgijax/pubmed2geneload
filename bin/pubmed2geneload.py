@@ -35,14 +35,25 @@ import mgi_utils
 import string
 import db
 import loadlib
-
-print '%s' % mgi_utils.date()
+import runCommand
 
 TAB = '\t'
 CRT = '\n'
 
 DEBUG = 0	 # if 0, not in debug mode
-bcpon =  1       # bcp into the database?  default is yes.
+bcpon = 1        # bcp into the database?  default is yes.
+
+# for creating API URL to update status
+
+PUT = 'curl -X PUT "'
+JAVA_API_URL = os.environ['JAVA_API_URL']
+JAVA_API_TOKEN = os.environ['JAVA_API_TOKEN']
+STATUS_URL = 'reference/statusUpdate?accid=%s&group=GO&status=Indexed" -H "accept: application/json" -H  "api_access_token: ' + JAVA_API_TOKEN + '" -H  "username: pubmed2geneload"'
+
+FULL_API_URL = PUT + JAVA_API_URL + STATUS_URL
+print 'FULL_API_URL: %s' % FULL_API_URL
+# max number of status updates in a batch
+UPDATE_BATCH = int(os.environ['UPDATE_BATCH'])
 
 refAssocKey = None
 mgiTypeKey = 2	# marker
@@ -59,7 +70,10 @@ dbPmToMgiDict = {}
 inputPmToEgDict = {}
 
 # {egID:[ [m1,symbols1, markerKey] ...], ...}
-dbEgToMarker = {}
+dbEgToMarkerDict = {}
+
+# {refID:[isDiscard, _Status_key], ...}
+dbRefIdToStatusDict = {}
 
 # curation log
 fpLogCur = ''
@@ -67,6 +81,9 @@ fpLogCur = ''
 # curated reference list
 #{ refsKey: markerKey, ...}
 curRefDict = {}
+
+# list of status updates
+statusUpdateList = []
 
 # diagnostic log
 fpLogDiag = ''
@@ -91,17 +108,20 @@ totalAdded = 0
 # total assoc already in db
 totalAssocInDb = 0
 
+# references that will be added to the database and potentially need
+# status updates
+refList = []
+
 # for reporting to the curation log
 inputPmIdNotInMgiList = [] # 1 PM ID not in the database
-inputPmIdMultiEgList = [] # 2 Reference Associated with > egID in input
+inputPmIdMultiEgList = [] # 2 Reference Associated with > 15 egID in input
 inputEgIdNotInMgiList =  [] # 3 EG ID not in the database  
 egIdMultiGenesList = [] # 4 EG ID associated with < 1 marker in database
 
 def init():
-    #global dbPmToMgiDict, inputEgToPmDict, dbEgToMarker
-    global dbPmToMgiDict, inputPmToEgDict, dbEgToMarker, curRefDict
+    global dbPmToMgiDict, inputPmToEgDict, dbEgToMarkerDict, curRefDict
     global refAssocKey, fpBcp, fpLogCur, fpLogDiag, totalAssoc
-
+    global dbRefIdToStatusDict
     # curation log
     fpLogCur = open (os.environ['LOG_CUR'], 'a')
 
@@ -180,9 +200,9 @@ def init():
 	markerID = r['markerID']
 	symbol = r['symbol']
 	markerKey = r['_Marker_key']
-        if egID not in dbEgToMarker:
-	    dbEgToMarker[egID] = []
-	dbEgToMarker[egID].append([markerID, symbol, markerKey])
+        if egID not in dbEgToMarkerDict:
+	    dbEgToMarkerDict[egID] = []
+	dbEgToMarkerDict[egID].append([markerID, symbol, markerKey])
     # -- used to determine if there is an existing ref/egid curated
     # -- association in the database
     # -- 1571 - exclude this loads user key as it hasn't been deleted yet.
@@ -203,6 +223,24 @@ def init():
 	if refsKey not in curRefDict:
 	    curRefDict[refsKey] = []
 	curRefDict[refsKey].append(markerKey)
+
+    # -- get status of all refs in the database
+    # -- used to update GO status when refs associated with genes
+    results = db.sql('''select a.accid as refID, b._Refs_key, b.isDiscard, 
+	    s._Status_key
+	from BIB_Refs b, BIB_Workflow_Status s, ACC_Accession a
+	where b._Refs_key = s._Refs_key
+	and b._Refs_key = a._Object_key
+	and a._MGIType_key = 1
+	and a._LogicalDB_key = 1
+	and a.preferred = 1
+	and a.prefixPart = 'MGI:'
+	and s._Group_key = 31576666''', 'auto')
+    for r in results:
+	refID = r['refID']
+	isDiscard = r['isDiscard']
+	statusKey = r['_Status_key']
+	dbRefIdToStatusDict[refID] = [isDiscard, statusKey]
     return 0
 
 #
@@ -214,30 +252,25 @@ def init():
 #
 
 def createBCP():
-    global refAssocKey
-    global inputPmIdNotInMgiList, inputPmIdMultiEgList, inputEgIdNotInMgiList
-    global egIdMultiGenesList, totalAssocInDb, totalAdded, totalDeleted
-
-    #for egID in inputEgToPmDict:
-        #pmList = inputEgToPmDict[egID]
+    global refAssocKey, inputPmIdNotInMgiList, inputPmIdMultiEgList
+    global inputEgIdNotInMgiList,egIdMultiGenesList, totalAssocInDb
+    global totalAdded, totalDeleted, refList
+        
     for pmID in inputPmToEgDict:
 	egList = inputPmToEgDict[pmID]
-	#if len(pmList) > 1: # 2
-        #    inputPmIdMultiEgList.append('%s%s%s%s' % (egID, TAB, string.join(pmList), CRT))
-        #    continue
 
-	if len(egList) > 1: # 2
+	if len(egList) > 15: # 2
 	    inputPmIdMultiEgList.append('%s%s%s' % (pmID, TAB, string.join(egList)))
 	    continue
 	egID = egList[0]  # here, we know we only have one
 	if pmID not in dbPmToMgiDict: # 1
 	    inputPmIdNotInMgiList.append('%s%s%s' % (egID, TAB, pmID))
 	    continue
-	if egID not in dbEgToMarker: # 3
+	if egID not in dbEgToMarkerDict: # 3
 	    inputEgIdNotInMgiList.append('%s%s%s' % (egID, TAB, pmID))
             continue
-	if len(dbEgToMarker[egID]) > 1: # 4
-	    markerList = dbEgToMarker[egID]
+	if len(dbEgToMarkerDict[egID]) > 1: # 4
+	    markerList = dbEgToMarkerDict[egID]
 	    reportList = []
 	    for l in markerList:
 		mID = l[0]
@@ -250,17 +283,24 @@ def createBCP():
 	    print 'more than one reference object for %s in database %s' % (pmID, dbPmToMgiDict[pmID])
 	    continue
 
-	refInfo = dbPmToMgiDict[pmID][0]
+	refInfo = dbPmToMgiDict[pmID][0] # [mgiID, jNum, refsKey]
 	#print refInfo
+	refID  = refInfo[0]
 	refKey = refInfo[2]
-	markerInfo = dbEgToMarker[egID][0] # [mgiID, jNum, refKey]
+	markerInfo = dbEgToMarkerDict[egID][0] # [mgiID, jNum, refKey]
+	
 	markerKey = markerInfo[2]
 	# skip if the reference/marker assoc already curated in the db
 	if refKey in curRefDict and markerKey in curRefDict[refKey]:
 	    totalAssocInDb += 1
 	    continue
+	refList.append(refID)
+	#rc = updateGoStatus(refID)
+	#print 'rc: %s' % rc
+	#if rc != 0:
+	#    fpLogDiag.write('Failed to read from url (refID %s, code %s)' % (refID, statusCode))
+	#    return rc
 	totalAdded += 1
-	# START HERE 2 call updateGoStatus with refKey
 	fpBcp.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' \
 	    % (refAssocKey, refKey, markerKey, mgiTypeKey, refAssocTypeKey, \
 	    createdByKey, createdByKey, loaddate, loaddate))
@@ -282,6 +322,7 @@ def bcpFiles():
     db.commit()
 
     # delete from MGI_Reference_Assoc
+    print 'deleting from MGI_Reference_Assoc'
     db.sql('''select _Assoc_key
 	into temporary table toDelete
 	from MGI_Reference_Assoc
@@ -294,12 +335,14 @@ def bcpFiles():
 
     for r in results:
 	totalDeleted = r['deleteCt']
-    print 'totalDeleted in bcpFiles(): %s' % totalDeleted
+
     db.sql('''delete from MGI_Reference_Assoc a
 	using toDelete d
 	where a._Assoc_key = d._Assoc_key''', None)
 
     db.commit()
+    print 'totalDeleted in bcpFiles(): %s' % totalDeleted
+
     # add new associations
     bcpCommand = os.environ['PG_DBUTILS'] + '/bin/bcpin.csh'
 
@@ -312,14 +355,53 @@ def bcpFiles():
 
     return 0
 
-# START HERE 1
-#def updateGoStatus(refKey):
+# Purpose:  Determines references that need GO status updates and updates them
+# Returns:  0 if successful, 1 if update failed
+# Assumes:  
+# Effects:  Updates GO status in the database
+# Throws:   nothing
+
+def updateGoStatus():
+    global refList
     # for all reference associations we are creating:
     # create lookup to check existing GO group status - 
     # 	if it is 'rejected' or 'discard', report
     # if current status is not 'Fully Coded' (or rejected or discard 
     # which is reported above), set status to 'Indexed' and generate Jnum
     # call the API to update the GO group status and  create Jnum 
+
+    # list of refIDs to update
+    updateStatusList = []
+    # get list of refIDs that actually need updating, reporting as we go
+    print 'updateGoStatus size of refList: %s' % len(refList)
+    for refID in refList:
+	if refID in dbRefIdToStatusDict:
+	    print 'updateGoStatus: %s' % refID
+	    infoList = dbRefIdToStatusDict[refID]
+	    isDiscard = infoList[0]
+	    statusKey = infoList[1]
+	    if isDiscard == 1 or statusKey == 31576672: # rejected
+		# report
+		print 'reporting isDiscard: %s, statusKey: %s' % (isDiscard, statusKey)
+		continue
+
+	    if statusKey != 31576674:
+		updateStatusList.append(refID)
+	else:
+            print 'RefID not in dbRefIdToStatusDict: %s' % refID
+    # now do the updates
+    print 'updateGOStatus size of updateStatusList: %s' % len(updateStatusList)
+    while updateStatusList != []:
+        batchToRun = string.join(updateStatusList[0:UPDATE_BATCH], ',')
+        print batchToRun
+	del updateStatusList[0:UPDATE_BATCH]
+	print '%s' % mgi_utils.date()
+	print 'running runCommand'
+	stdout, stderr, returnCode = runCommand.runCommand(FULL_API_URL % batchToRun)
+	print 'after runCommand stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode)
+	if returnCode != 0:
+	    return 1
+    return 0
 #
 # Purpose: write all errors to curation log
 # Returns: Nothing
@@ -351,7 +433,7 @@ def writeCuratorLog():
 	fpLogCur.write(CRT + 'Total: %s' % len(inputPmIdNotInMgiList))
     if len(inputPmIdMultiEgList):
 	fpLogCur.write(CRT + CRT + string.center(
-            'PM IDs  Associated with > 1 egID in Input',60) + CRT)
+            'PM IDs  Associated with > 15 egID in Input',60) + CRT)
 	fpLogCur.write('%-12s  %-20s%s' %
             ('PM ID','EG IDs', CRT))
 	fpLogCur.write(string.join(inputPmIdMultiEgList, CRT))
@@ -387,23 +469,40 @@ def closeFiles():
 	fpLogDiag.close()
     return 0
 
+#
 # Main
+#
 
+print '%s' % mgi_utils.date()
+print 'running init'
 if init() != 0:
     print 'Initialization failed'
     closeFiles()
     sys.exit(1)
 
+print '%s' % mgi_utils.date()
+print 'running createBCP'
 if createBCP() != 0:
     print 'Creating BCP Files failed'
     closeFiles()
     sys.exit(1)
 
+print '%s' % mgi_utils.date()
+print 'running bcpFiles'
 if bcpFiles() != 0:
     print 'BCP failed'
     closeFiles()
     sys.exit(1)
 
+print '%s' % mgi_utils.date()
+print 'running updateGoStatus'
+if updateGoStatus()  != 0:
+    print 'Status updates failed'
+    closeFiles()
+    sys.exit(1)
+
+print '%s' % mgi_utils.date()
+print 'running writeCuratorLog'
 if writeCuratorLog() != 0:
     print 'Writing to curator log failed'
     closeFiles()
