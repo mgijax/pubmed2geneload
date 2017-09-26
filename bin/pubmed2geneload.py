@@ -124,7 +124,7 @@ numUpdates = 0
 inputPmIdNotInMgiList = [] # 1 PM ID not in the database
 inputPmIdMultiEgList = [] # 2 Reference Associated with > 15 egID in input
 inputEgIdNotInMgiList =  [] # 3 EG ID not in the database  
-egIdMultiGenesList = [] # 4 EG ID associated with < 1 marker in database
+egIdMultiGenesList = [] # 4 EG ID associated with > 1 marker in database
 dOrRStatusList = [] # 5 current status is discard or rejected
 
 #
@@ -218,7 +218,9 @@ def init():
 	markerKey = r['_Marker_key']
         if egID not in dbEgToMarkerDict:
 	    dbEgToMarkerDict[egID] = []
-	dbEgToMarkerDict[egID].append([markerID, symbol, markerKey])
+	listToAppend = [markerID, symbol, markerKey]
+	if listToAppend not in dbEgToMarkerDict[egID]:
+	    dbEgToMarkerDict[egID].append(listToAppend)
     # -- used to determine if there is an existing ref/egid curated
     # -- association in the database
     # -- 1571 - exclude this loads user key as it hasn't been deleted yet.
@@ -242,16 +244,13 @@ def init():
 
     # -- get status of all refs in the database
     # -- used to update GO status when refs associated with genes
-    results = db.sql('''select a.accid as refID, b._Refs_key, b.isDiscard, 
+    results = db.sql('''select a.mgiid as refID, b._Refs_key, b.isDiscard, 
 	    s._Status_key
-	from BIB_Refs b, BIB_Workflow_Status s, ACC_Accession a
-	where b._Refs_key = s._Refs_key
-	and b._Refs_key = a._Object_key
-	and a._MGIType_key = 1
-	and a._LogicalDB_key = 1
-	and a.preferred = 1
-	and a.prefixPart = 'MGI:'
-	and s._Group_key = 31576666''', 'auto')
+        from BIB_Refs b, BIB_Workflow_Status s, BIB_Citation_Cache a
+        where b._Refs_key = s._Refs_key
+        and b._Refs_key = a._Refs_key
+        and s._Group_key = 31576666
+	and s.isCurrent = 1''', 'auto')
     for r in results:
 	refID = r['refID']
 	isDiscard = r['isDiscard']
@@ -466,7 +465,7 @@ def writeCuratorLog():
 	fpLogCur.write(CRT + 'Total: %s' % len(inputEgIdNotInMgiList))
     if len(egIdMultiGenesList):
 	fpLogCur.write(CRT + CRT + string.center(
-            'EG IDs associated with < 1 marker in the Database',60) + CRT)
+            'EG IDs associated with > 1 marker in the Database',60) + CRT)
 	fpLogCur.write('%-12s  %-20s  %-20s%s' %
              ('EG ID','PM ID', 'Markers', CRT))
 	fpLogCur.write(string.join(egIdMultiGenesList, CRT))
