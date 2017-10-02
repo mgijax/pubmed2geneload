@@ -227,11 +227,12 @@ def init():
     results = db.sql('''select distinct ra._Refs_key, a._Object_key as markerKey, a.accid as egId
 	from MGI_Reference_Assoc ra, ACC_Accession a, MGI_User u
 	where ra._MGIType_key = 2
+	and and ra._refassoctype_key = 1018
 	and ra._CreatedBy_key != 1571
 	and ra._CreatedBy_key = u._User_key
 	and ra._Object_key = a._Object_key 
 	and a._MGIType_key = 2
-	and a._LOgicalDB_key = 55 --entrezgene
+	and a._LogicalDB_key = 55 --entrezgene
 	and a.preferred = 1''', 'auto')
 
     for r in results:
