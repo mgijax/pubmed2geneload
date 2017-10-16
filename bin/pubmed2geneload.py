@@ -43,7 +43,7 @@ import string
 import db
 import loadlib
 import runCommand
-
+	
 TAB = '\t'
 CRT = '\n'
 
@@ -69,7 +69,7 @@ refAssocTypeKey = 1018 # General
 createdByKey = 1571 # pubmed2geneload
 loaddate = loadlib.loaddate # today's date
 
-# {pmID:[[mgiID, jNum, refsKey], ...], ...}
+# {pmID:[[mgiID, refsKey], ...], ...}
 dbPmToMgiDict = {}
 
 # pmID:[egID, ...], ...}
@@ -109,6 +109,9 @@ totalDeleted = 0
 # Total gene/reference associations added to the databaase
 totalAdded = 0
 
+# total mouse associations in input
+totalAssocInput = 0
+
 # total assoc already in db
 totalAssocInDb = 0
 
@@ -136,7 +139,7 @@ dOrRStatusList = [] # 5 current status is discard or rejected
 #
 def init():
     global dbPmToMgiDict, inputPmToEgDict, dbEgToMarkerDict, curRefDict
-    global refAssocKey, fpBcp, fpLogCur, fpLogDiag, totalAssoc
+    global refAssocKey, fpBcp, fpLogCur, fpLogDiag, totalAssocInput
     global dbRefIdToStatusDict
     # curation log
     fpLogCur = open (os.environ['LOG_CUR'], 'a')
@@ -154,18 +157,13 @@ def init():
     # -- get all refs with pubmed IDs
     # -- use to determine if PM id not in db
     # -- used in report of multi egIDs assoc with pmid in file
-    results = db.sql('''select a1._Object_key as refsKey, a1.accid as mgiID, 
-	    a2.accid as jNum, a3.accid as pmID
-	from ACC_Accession a1, ACC_Accession a2, ACC_Accession a3
+    results = db.sql('''select a1._Object_key as refsKey, a1.accid as mgiID,
+	     a3.accid as pmID
+	from ACC_Accession a1, ACC_Accession a3
 	where a1._MGIType_key = 1
 	and a1._LogicalDB_key = 1
 	and a1.preferred = 1
 	and a1.prefixPart = 'MGI:'
-	and a1._Object_key = a2._Object_key 
-	and a2._MGIType_key = 1
-	and a2._LogicalDB_key = 1
-	and a2.preferred = 1
-	and a2.prefixPart = 'J:'
 	and a1._Object_key = a3._Object_key
 	and a3._MGIType_key = 1
 	and a3._LogicalDB_key = 29
@@ -173,18 +171,17 @@ def init():
     for r in results:
 	pmID = r['pmID']
 	mgiID = r['mgiID']
-	jNum = r['jNum']
 	refsKey = r['refsKey']
 	if pmID not in dbPmToMgiDict:
 	    dbPmToMgiDict[pmID] = []
-	dbPmToMgiDict[pmID].append([mgiID, jNum, refsKey])
+	dbPmToMgiDict[pmID].append([mgiID, refsKey])
     # -- get mouse gene/ref pairs
     # -- load into dict, use to iterate through pubmed/id gene pairs
     # -- and report genes assoc with >1 pmid at EG
     results = db.sql('''select geneid, pubmedid
 	from DP_EntrezGene_PubMed
 	where taxid = 10090''', 'auto')
-    totalAssoc = len(results)
+    totalAssocInput = len(results)
     for r in results:
 	pmID = r['pubmedid']
 	egID = r['geneid']
@@ -245,13 +242,17 @@ def init():
 
     # -- get status of all refs in the database
     # -- used to update GO status when refs associated with genes
+    db.sql('''select _Refs_key, _Status_key
+	into temporary table goCurrent
+	from BIB_Workflow_Status
+	where _Group_key = 31576666
+	and isCurrent = 1''', None)
+    db.sql('create index idx2 on goCurrent(_Refs_key)', None)
     results = db.sql('''select a.mgiid as refID, b._Refs_key, b.isDiscard, 
 	    s._Status_key
-        from BIB_Refs b, BIB_Workflow_Status s, BIB_Citation_Cache a
+        from BIB_Refs b, goCurrent s, BIB_Citation_Cache a
         where b._Refs_key = s._Refs_key
-        and b._Refs_key = a._Refs_key
-        and s._Group_key = 31576666
-	and s.isCurrent = 1''', 'auto')
+        and b._Refs_key = a._Refs_key''', 'auto')
     for r in results:
 	refID = r['refID']
 	isDiscard = r['isDiscard']
@@ -290,9 +291,9 @@ def createBCP():
 	# get the reference info first
 	refInfo = dbPmToMgiDict[pmID][0] # Here we now we have one as multi's
                                          # reported above
-                                         # [mgiID, jNum, refsKey]
+                                         # [mgiID, refsKey]
         refID  = refInfo[0]
-        refKey = refInfo[2]
+        refKey = refInfo[1]
 
 	# now iterate over the genes for this reference
 	for egID in egList:
@@ -315,7 +316,6 @@ def createBCP():
 	    # get the marker  key
 	    markerInfo = dbEgToMarkerDict[egID][0] # Here we know we have one
 						   # as multi reported above
-						   # [mgiID, jNum, refKey]
 	    
 	    markerKey = markerInfo[2]
 	    # skip if the reference/marker assoc already curated in the db
@@ -338,7 +338,7 @@ def createBCP():
 # Throws:   nothing
 #
 def bcpFiles():
-    global totalDeleted
+    global totalDeleted, refsDeletedList
     fpBcp.close()
     if DEBUG or not bcpon:
 	return 0
@@ -352,6 +352,7 @@ def bcpFiles():
 	from MGI_Reference_Assoc
 	where _CreatedBy_key = 1571''', None)
 
+   
     db.sql('''create index idx1 on toDelete(_Assoc_key)''', None)
 
     results = db.sql('''select count(*) as deleteCt
@@ -403,6 +404,7 @@ def updateGoStatus():
 	    infoList = dbRefIdToStatusDict[refID]
 	    isDiscard = infoList[0]
 	    statusKey = infoList[1]
+	    print 'refID: %s, isDiscard: %s statusKey: %s' % (refID, isDiscard, statusKey)
 	    if isDiscard == 1 or statusKey == 31576672: # rejected
 		# report
 		d = 'False'
@@ -412,8 +414,10 @@ def updateGoStatus():
 		if statusKey == 31576672:
 		    s = 'Rejected'
 		dOrRStatusList.append('%s%s%s%s%s' % (refID, TAB, d, TAB, s))
+		print 'writing %s to discardOrRejected report' % refID
 		continue
-	    if statusKey != 31576674:
+	    if statusKey not in (31576673, 31576674): # Indexed, Full-coded
+		print 'adding %s to list to be updated' % refID
 		updateStatusList.append(refID)
 	else: # this should never happen
             print 'RefID not in dbRefIdToStatusDict: %s' % refID
@@ -440,7 +444,7 @@ def updateGoStatus():
 # Throws: Nothing
 #
 def writeCuratorLog():
-    fpLogCur.write(CRT + CRT + 'Total PubMed/EG ID associations from EntrezGene: %s' % totalAssoc)
+    fpLogCur.write(CRT + CRT + 'Total PubMed/EG ID associations from EntrezGene: %s' % totalAssocInput)
     fpLogCur.write(CRT + CRT + 'Total PubMed/EG ID associations already in Database: %s' % totalAssocInDb)
     fpLogCur.write(CRT + CRT + 'Total PubMed/EG ID associations deleted from the Database: %s' % totalDeleted)
     fpLogCur.write(CRT + CRT + 'Total PubMed/EG ID added to the Database: %s' % totalAdded)
