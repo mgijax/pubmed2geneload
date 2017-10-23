@@ -54,7 +54,7 @@ bcpon = 1        # bcp into the database?  default is yes.
 PUT = 'curl -X PUT "'
 JAVA_API_URL = os.environ['JAVA_API_URL']
 JAVA_API_TOKEN = os.environ['JAVA_API_TOKEN']
-STATUS_URL = 'reference/statusUpdate?accid=%s&group=GO&status=Indexed" -H "accept: application/json" -H  "api_access_token: ' + JAVA_API_TOKEN + '" -H  "username: pubmed2geneload"'
+STATUS_URL = 'reference/statusUpdate?accid=%s&group=GO&status=Indexed" -H "accept: application/json" -H  "api_access_token: ' + JAVA_API_TOKEN + '" -H  "username: pm2geneload"'
 
 # the full URL - just plug in comma delim (no space) list of reference MGI ID
 FULL_API_URL = PUT + JAVA_API_URL + STATUS_URL
