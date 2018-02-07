@@ -151,7 +151,7 @@ def init():
     fpBcp = open(os.environ['BCP_FILE'], 'w')
 
 
-    results = db.sql('select max(_Assoc_key) + 1 as maxKey from MGI_Reference_Assoc', 'auto')
+    results = db.sql(''' select nextval('mgi_reference_assoc_seq') as maxKey ''', 'auto')
     refAssocKey = results[0]['maxKey']
 
     # -- get all refs with pubmed IDs
@@ -377,6 +377,9 @@ def bcpFiles():
     fpLogDiag.write('%s\n' % bcpCmd)
     print 'executing bcp'
     os.system(bcpCmd)
+
+    # update mgi_reference_assoc_seq auto-sequence
+    db.sql(''' select setval('mgi_reference_assoc_seq', (select max(_Assoc_key) + 1 from MGI_Reference_Assoc)) ''', None)
 
     return 0
 
