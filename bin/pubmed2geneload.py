@@ -141,6 +141,10 @@ def init():
     global dbPmToMgiDict, inputPmToEgDict, dbEgToMarkerDict, curRefDict
     global refAssocKey, fpBcp, fpLogCur, fpLogDiag, totalAssocInput
     global dbRefIdToStatusDict
+
+    # Log all SQL
+    db.set_sqlLogFunction(db.sqlLogAll)
+
     # curation log
     fpLogCur = open (os.environ['LOG_CUR'], 'a')
 
