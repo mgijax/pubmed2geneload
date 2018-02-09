@@ -34,6 +34,10 @@
 #
 #  Notes: This script uses the Java API (mgd_java_api) to do status updates
 #
+# History
+#	2/9/2018	sc
+#	- TR12760 - create marker/reference associations and update GO status
+#		only if reference has JNumber
 ###########################################################################
 
 import sys
@@ -154,16 +158,21 @@ def init():
     results = db.sql('select max(_Assoc_key) + 1 as maxKey from MGI_Reference_Assoc', 'auto')
     refAssocKey = results[0]['maxKey']
 
-    # -- get all refs with pubmed IDs
-    # -- use to determine if PM id not in db
+    # -- get all refs with pubmed IDs AND JNumbers
+    # -- use to determine if pm ID associated w/reference that has a JNum
     # -- used in report of multi egIDs assoc with pmid in file
     results = db.sql('''select a1._Object_key as refsKey, a1.accid as mgiID,
 	     a3.accid as pmID
-	from ACC_Accession a1, ACC_Accession a3
+	from ACC_Accession a1, ACC_Accession a2, ACC_Accession a3
 	where a1._MGIType_key = 1
 	and a1._LogicalDB_key = 1
 	and a1.preferred = 1
 	and a1.prefixPart = 'MGI:'
+	and a1._Object_key = a2._Object_key
+        and a2._MGIType_key = 1
+        and a2._LogicalDB_key = 1
+        and a2.prefixPart = 'J:'
+        and a2.preferred = 1
 	and a1._Object_key = a3._Object_key
 	and a3._MGIType_key = 1
 	and a3._LogicalDB_key = 29
@@ -451,7 +460,7 @@ def writeCuratorLog():
     fpLogCur.write(CRT + CRT + 'Total References  updated to "Indexed" for GO: %s' % numUpdates)
     if len(inputPmIdNotInMgiList):
 	fpLogCur.write(CRT + CRT + string.center(
-	    'PM IDs not in the Database',60) + CRT)
+	    'PM IDs not in the Database or reference has no J: number',60) + CRT)
 	fpLogCur.write(string.join(inputPmIdNotInMgiList, CRT))
 	fpLogCur.write(CRT + 'Total: %s' % len(inputPmIdNotInMgiList))
     if len(inputPmIdMultiEgList):
