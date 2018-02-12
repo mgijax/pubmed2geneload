@@ -388,7 +388,7 @@ def bcpFiles():
     os.system(bcpCmd)
 
     # update mgi_reference_assoc auto-sequence
-    db.sql(''' select setval('mgi_reference_assoc', (select max(_assoc_key) from MGI_Reference_Assoc)) ''', None)
+    db.sql(''' select setval('mgi_reference_assoc_seq', (select max(_assoc_key) from MGI_Reference_Assoc)) ''', None)
     db.commit()
 
     return 0
