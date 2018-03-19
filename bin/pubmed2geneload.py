@@ -92,6 +92,11 @@ fpLogCur = ''
 #{ refsKey: markerKey, ...}
 curRefDict = {}
 
+# _refs_key,_object_key must be unique
+# use this list to check for duplicates
+# duplicates will be skipped
+refMarkerList = []
+
 # list of status updates
 statusUpdateList = []
 
@@ -284,7 +289,7 @@ def init():
 def createBCP():
     global refAssocKey, inputPmIdNotInMgiList, inputPmIdMultiEgList
     global inputEgIdNotInMgiList,egIdMultiGenesList, totalAssocInDb
-    global totalAdded, totalDeleted, refList
+    global totalAdded, totalDeleted, refList, refMarkerList
         
     for pmID in inputPmToEgDict:
 	egList = inputPmToEgDict[pmID]
@@ -335,6 +340,13 @@ def createBCP():
 	    if refKey in curRefDict and markerKey in curRefDict[refKey]:
 		totalAssocInDb += 1
 		continue
+
+            # skip if reference/marker is a duplicate
+            if (refKey, markerKey) in refMarkerList:
+                continue
+            else:
+                refMarkerList.append((refKey, markerKey))
+
 	    if refID not in refList:
 		refList.append(refID)
 	    totalAdded += 1

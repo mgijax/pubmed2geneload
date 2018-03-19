@@ -1,4 +1,10 @@
-TAG: pubmed2geneload-6-0-12-?
+TAG: pubmed2geneload-6-0-12-2
+DATE: 03/19/2018
+STAFF: lec
+CHANGES:
+TR12822/add duplicate check
+
+TAG: pubmed2geneload-6-0-12-1
 DATE: 02/07/2018
 STAFF: lec
 CHANGES:
