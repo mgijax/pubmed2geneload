@@ -294,7 +294,7 @@ def createBCP():
         egList = inputPmToEgDict[pmID]
 
         if len(egList) > 15: # 2
-            inputPmIdMultiEgList.append('%s%s%s' % (pmID, TAB, string.join(egList)))
+        inputPmIdMultiEgList.append('%s%s%s' % (pmID, TAB, ''.join(egList)))
             continue
         #egID = egList[0]  # we know we have < 16
         if pmID not in dbPmToMgiDict: # 1
@@ -302,7 +302,7 @@ def createBCP():
             continue
         if len(dbPmToMgiDict[pmID]) > 1:
             # Just curious so checking  - this will go to diag log
-            print 'more than one reference object for %s in database %s' % (pmID, dbPmToMgiDict[pmID])
+            print('more than one reference object for %s in database %s' % (pmID, dbPmToMgiDict[pmID]))
             continue
 
         # get the reference info first
@@ -327,7 +327,7 @@ def createBCP():
                     symbol = l[1]
                     reportList.append('%s|%s' % (mID, symbol))
                 egIdMultiGenesList.append('%s%s%s%s%s' % \
-                    (egID, TAB, pmID, TAB, string.join(reportList)))
+                    (egID, TAB, pmID, TAB, str.join(reportList)))
                 continue
 
             # get the marker  key
@@ -370,7 +370,7 @@ def bcpFiles():
     db.commit()
 
     # delete from MGI_Reference_Assoc
-    print 'deleting from MGI_Reference_Assoc'
+    print('deleting from MGI_Reference_Assoc')
     db.sql('''select _Assoc_key
         into temporary table toDelete
         from MGI_Reference_Assoc
@@ -390,16 +390,16 @@ def bcpFiles():
         where a._Assoc_key = d._Assoc_key''', None)
 
     db.commit()
-    print 'totalDeleted in bcpFiles(): %s' % totalDeleted
+    print('totalDeleted in bcpFiles(): %s' % totalDeleted)
 
     # add new associations
     bcpCommand = os.environ['PG_DBUTILS'] + '/bin/bcpin.csh'
 
     bcpCmd = '%s %s %s %s %s %s "\|" "\\n" mgd' % \
         (bcpCommand, db.get_sqlServer(), db.get_sqlDatabase(), refTable, outputDir, bcpFile)
-    print bcpCmd
+    print(bcpCmd)
     fpLogDiag.write('%s\n' % bcpCmd)
-    print 'executing bcp'
+    print('executing bcp')
     os.system(bcpCmd)
 
     # update mgi_reference_assoc auto-sequence
@@ -425,14 +425,14 @@ def updateGoStatus():
     #       and generate Jnum, if necessary, using Java API
 
     # get list of refIDs that actually need updating, reporting as we go
-    print 'updateGoStatus size of refList: %s' % len(refList)
+    print('updateGoStatus size of refList: %s' % len(refList))
     for refID in refList:
         if refID in dbRefIdToStatusDict:
-            print 'updateGoStatus: %s' % refID
+            print('updateGoStatus: %s' % refID)
             infoList = dbRefIdToStatusDict[refID]
             isDiscard = infoList[0]
             statusKey = infoList[1]
-            print 'refID: %s, isDiscard: %s statusKey: %s' % (refID, isDiscard, statusKey)
+            print('refID: %s, isDiscard: %s statusKey: %s' % (refID, isDiscard, statusKey))
             if isDiscard == 1 or statusKey == 31576672: # rejected
                 # report
                 d = 'False'
@@ -442,25 +442,25 @@ def updateGoStatus():
                 if statusKey == 31576672:
                     s = 'Rejected'
                 dOrRStatusList.append('%s%s%s%s%s' % (refID, TAB, d, TAB, s))
-                print 'writing %s to discardOrRejected report' % refID
+                print('writing %s to discardOrRejected report' % refID)
                 continue
             if statusKey not in (31576673, 31576674): # Indexed, Full-coded
-                print 'adding %s to list to be updated' % refID
+                print('adding %s to list to be updated' % refID)
                 updateStatusList.append(refID)
         else: # this should never happen
-            print 'RefID not in dbRefIdToStatusDict: %s' % refID
+            print('RefID not in dbRefIdToStatusDict: %s' % refID)
     # now do the updates
     numUpdates = len(updateStatusList)
-    print 'updateGOStatus size of updateStatusList: %s' % len(updateStatusList)
+    print('updateGOStatus size of updateStatusList: %s' % len(updateStatusList))
     while updateStatusList != []:
-        batchToRun = string.join(updateStatusList[0:UPDATE_BATCH], ',')
+        batchToRun = ','.join(updateStatusList[0:UPDATE_BATCH])
         #print batchToRun
         del updateStatusList[0:UPDATE_BATCH]
-        print '%s' % mgi_utils.date()
-        print 'running runCommand'
-        print FULL_API_URL % batchToRun
+        print('%s' % mgi_utils.date())
+        print('running runCommand')
+        print(FULL_API_URL % batchToRun)
         stdout, stderr, returnCode = runCommand.runCommand(FULL_API_URL % batchToRun)
-        print 'after runCommand stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode)
+        print('after runCommand stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
         if returnCode != 0:
             return 1
     return 0
@@ -478,37 +478,37 @@ def writeCuratorLog():
     fpLogCur.write(CRT + CRT + 'Total PubMed/EG ID added to the Database: %s' % totalAdded)
     fpLogCur.write(CRT + CRT + 'Total References  updated to "Indexed" for GO: %s' % numUpdates)
     if len(inputPmIdNotInMgiList):
-        fpLogCur.write(CRT + CRT + string.center(
+        fpLogCur.write(CRT + CRT + str.center(
             'PM IDs not in the Database or reference has no J: number',60) + CRT)
-        fpLogCur.write(string.join(inputPmIdNotInMgiList, CRT))
+        fpLogCur.write(CRT.join(inputPmIdNotInMgiList))
         fpLogCur.write(CRT + 'Total: %s' % len(inputPmIdNotInMgiList))
     if len(inputPmIdMultiEgList):
-        fpLogCur.write(CRT + CRT + string.center(
+        fpLogCur.write(CRT + CRT + str.center(
             'PM IDs  Associated with > 15 egID in Input',60) + CRT)
         fpLogCur.write('%-12s  %-20s%s' %
             ('PM ID','EG IDs', CRT))
-        fpLogCur.write(string.join(inputPmIdMultiEgList, CRT))
+        fpLogCur.write(CRT.join(inputPmIdMultiEgList))
         fpLogCur.write(CRT + 'Total: %s' % len(inputPmIdMultiEgList))
     if len(inputEgIdNotInMgiList):
-        fpLogCur.write(CRT + CRT + string.center(
+        fpLogCur.write(CRT + CRT + str.center(
             'EG IDs not in the Database',60) + CRT)
         fpLogCur.write('%-12s  %-20s%s' %
              ('EG ID','PM ID', CRT))
-        fpLogCur.write(string.join(inputEgIdNotInMgiList, CRT))
+        fpLogCur.write(CRT.join(inputEgIdNotInMgiList))
         fpLogCur.write(CRT + 'Total: %s' % len(inputEgIdNotInMgiList))
     if len(egIdMultiGenesList):
-        fpLogCur.write(CRT + CRT + string.center(
+        fpLogCur.write(CRT + CRT + str.center(
             'EG IDs associated with > 1 marker in the Database',60) + CRT)
         fpLogCur.write('%-12s  %-20s  %-20s%s' %
              ('EG ID','PM ID', 'Markers', CRT))
-        fpLogCur.write(string.join(egIdMultiGenesList, CRT))
+        fpLogCur.write(CRT.join(egIdMultiGenesList))
         fpLogCur.write(CRT + 'Total: %s' % len(egIdMultiGenesList))
     if len(dOrRStatusList):
-        fpLogCur.write(CRT + CRT + string.center(
+        fpLogCur.write(CRT + CRT + str.center(
             'References with isDiscard=true or Status=Rejected',60) + CRT)
         fpLogCur.write('%-12s  %-20s  %-20s%s' %
              ('Reference ID','isDiscard', 'Status', CRT))
-        fpLogCur.write(string.join(dOrRStatusList, CRT))
+        fpLogCur.write(CRT.join(dOrRStatusList))
         fpLogCur.write(CRT + 'Total: %s' % len(dOrRStatusList))
     return 0
 #
@@ -531,42 +531,42 @@ def closeFiles():
 # Main
 #
 
-print '%s' % mgi_utils.date()
-print 'running init'
+print('%s' % mgi_utils.date())
+print('running init')
 if init() != 0:
-    print 'Initialization failed'
+    print('Initialization failed')
     closeFiles()
     sys.exit(1)
 
-print '%s' % mgi_utils.date()
-print 'running createBCP'
+print('%s' % mgi_utils.date())
+print('running createBCP')
 if createBCP() != 0:
-    print 'Creating BCP Files failed'
+    print('Creating BCP Files failed')
     closeFiles()
     sys.exit(1)
 
-print '%s' % mgi_utils.date()
-print 'running bcpFiles'
+print('%s' % mgi_utils.date())
+print('running bcpFiles')
 if bcpFiles() != 0:
-    print 'BCP failed'
+    print('BCP failed')
     closeFiles()
     sys.exit(1)
 
-print '%s' % mgi_utils.date()
-print 'running updateGoStatus'
+print('%s' % mgi_utils.date())
+print('running updateGoStatus')
 if updateGoStatus()  != 0:
-    print 'Status updates failed'
+    print('Status updates failed')
     closeFiles()
     sys.exit(1)
 
-print '%s' % mgi_utils.date()
-print 'running writeCuratorLog'
+print('%s' % mgi_utils.date())
+print('running writeCuratorLog')
 if writeCuratorLog() != 0:
-    print 'Writing to curator log failed'
+    print('Writing to curator log failed')
     closeFiles()
     sys.exit(1)
 
 closeFiles()
 
-print '%s' % mgi_utils.date()
+print('%s' % mgi_utils.date())
 sys.exit(0)
