@@ -95,7 +95,7 @@ preload ${OUTPUTDIR}
 # Create associations in the database
 #
 echo "Creating PubMed to Gene Associations" >> ${LOG_DIAG}
-${PUBMED2GENELOAD}/bin/pubmed2geneload.py >> ${LOG_DIAG}
+${PYTHON} ${PUBMED2GENELOAD}/bin/pubmed2geneload.py >> ${LOG_DIAG}
 STAT=$?
 checkStatus ${STAT} "pubmed2geneload.py"
 

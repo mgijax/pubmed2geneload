@@ -45,7 +45,7 @@ import mgi_utils
 import string
 import db
 import loadlib
-import runCommand
+import subprocess
         
 TAB = '\t'
 CRT = '\n'
@@ -259,6 +259,8 @@ def init():
 
     # -- get status of all refs in the database
     # -- used to update GO status when refs associated with genes
+    print('getting list of refs in database')
+    sys.stdout.flush()
     db.sql('''select _Refs_key, _Status_key
         into temporary table goCurrent
         from BIB_Workflow_Status
@@ -294,7 +296,7 @@ def createBCP():
         egList = inputPmToEgDict[pmID]
 
         if len(egList) > 15: # 2
-        inputPmIdMultiEgList.append('%s%s%s' % (pmID, TAB, ''.join(egList)))
+            inputPmIdMultiEgList.append('%s%s%s' % (pmID, TAB, ''.join(egList)))
             continue
         #egID = egList[0]  # we know we have < 16
         if pmID not in dbPmToMgiDict: # 1
@@ -457,10 +459,16 @@ def updateGoStatus():
         #print batchToRun
         del updateStatusList[0:UPDATE_BATCH]
         print('%s' % mgi_utils.date())
-        print('running runCommand')
+        print('running subprocess')
         print(FULL_API_URL % batchToRun)
-        stdout, stderr, returnCode = runCommand.runCommand(FULL_API_URL % batchToRun)
-        print('after runCommand stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
+        cmd = FULL_API_URL % batchToRun
+
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        stdout = result.stdout
+        stderr = result.stderr
+        returnCode = result.returncode
+
+        print('after subprocess stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
         if returnCode != 0:
             return 1
     return 0
@@ -533,6 +541,7 @@ def closeFiles():
 
 print('%s' % mgi_utils.date())
 print('running init')
+sys.stdout.flush()
 if init() != 0:
     print('Initialization failed')
     closeFiles()
@@ -540,6 +549,7 @@ if init() != 0:
 
 print('%s' % mgi_utils.date())
 print('running createBCP')
+sys.stdout.flush()
 if createBCP() != 0:
     print('Creating BCP Files failed')
     closeFiles()
@@ -547,6 +557,7 @@ if createBCP() != 0:
 
 print('%s' % mgi_utils.date())
 print('running bcpFiles')
+sys.stdout.flush()
 if bcpFiles() != 0:
     print('BCP failed')
     closeFiles()
@@ -554,6 +565,7 @@ if bcpFiles() != 0:
 
 print('%s' % mgi_utils.date())
 print('running updateGoStatus')
+sys.stdout.flush()
 if updateGoStatus()  != 0:
     print('Status updates failed')
     closeFiles()
@@ -561,6 +573,7 @@ if updateGoStatus()  != 0:
 
 print('%s' % mgi_utils.date())
 print('running writeCuratorLog')
+sys.stdout.flush()
 if writeCuratorLog() != 0:
     print('Writing to curator log failed')
     closeFiles()
