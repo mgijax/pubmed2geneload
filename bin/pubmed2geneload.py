@@ -134,8 +134,6 @@ def init():
     db.sql('create index associdx1 on currentAssocs(_refs_key)', None)
     db.sql('create index associdx2 on currentAssocs(pubmedid)', None)
     db.sql('create index associdx3 on currentAssocs(geneid)', None)
-    results = db.sql('select count(*) as totalCount from currentAssocs', 'auto')
-    totalAssocInDb = results[0]['totalCount']
 
     #
     # pubmed -> eg group > 15
@@ -149,7 +147,6 @@ def init():
         group by pubmedid having count(*) > 15
         ''', None)
     db.sql('create index pmidx1 on pmMultiples(pubmedid)', None)
-    results = db.sql('select pubmedid from pmMultiples', 'auto')
         
     #
     # egid with > 1 marker
@@ -329,33 +326,37 @@ def updateGoStatus():
 
         batchToRun = ','.join(assocStatusRefList[0:UPDATE_BATCH])
         print(batchToRun)
-        testGoStatus(batchToRun)
+        checkGoStatus(batchToRun, 'before')
         del assocStatusRefList[0:UPDATE_BATCH]
 
         print('%s' % mgi_utils.date())
         print('running subprocess')
         print(FULL_API_URL % batchToRun)
 
-        #cmd = FULL_API_URL % batchToRun
-        #result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        #stdout = result.stdout
-        #stderr = result.stderr
-        #returnCode = result.returncode
+        cmd = FULL_API_URL % batchToRun
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        stdout = result.stdout
+        stderr = result.stderr
+        returnCode = result.returncode
 
-        #print('after subprocess stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
+        print('after subprocess stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
+        checkGoStatus(batchToRun, 'after')
 
-        #if returnCode != 0:
-        #    return 1
-
-    testGoStatus(batchToRun)
+        if returnCode != 0:
+            return 1
 
     return 0
 
-def testGoStatus(batchToRun):
+def checkGoStatus(batchToRun, mode):
 
     testbatchToRun = batchToRun.replace(",MGI:", "',MGI:")
     testbatchToRun = testbatchToRun.replace("MGI:", "'MGI:")
     testbatchToRun += "'"
+
+    if mode == 'before':
+       statusSQL = 'and s._Status_key in (31576669, 31576670, 31576671, 71027551)'
+    else:
+       statusSQL = 'and s._Status_key in (31576673)'
 
     results = db.sql('''
         select c._refs_key, c.mgiID, c.jnumid, c.pubmedid, t.term as relvance, t2.term as status,
@@ -371,13 +372,13 @@ def testGoStatus(batchToRun):
         and r._refs_key = s._refs_key
         and s.isCurrent = 1
         and s._Group_key = 31576666
-        and s._Status_key in (31576669, 31576670, 31576671, 71027551)
+        %s
         and s._status_key = t2._term_key
         and s._group_key = t3._term_key
         and s._createdby_key = u2._user_key
         and c.mgiid in (%s)
         order by c.short_citation, t3.term
-        ''' % (testbatchToRun), 'auto')
+        ''' % (statusSQL, testbatchToRun), 'auto')
     for r in results:
         print(r)
 
@@ -415,13 +416,13 @@ if createBCP() != 0:
     closeFiles()
     sys.exit(1)
 
-#print('%s' % mgi_utils.date())
-#print('running bcpFiles')
-#sys.stdout.flush()
-#if bcpFiles() != 0:
-#    print('BCP failed')
-#    closeFiles()
-#    sys.exit(1)
+print('%s' % mgi_utils.date())
+print('running bcpFiles')
+sys.stdout.flush()
+if bcpFiles() != 0:
+    print('BCP failed')
+    closeFiles()
+    sys.exit(1)
 
 print('%s' % mgi_utils.date())
 print('running updateGoStatus')
