@@ -6,7 +6,6 @@
 #  Purpose:
 # 	This script creates pubmed2gene associations in the db
 #
-  Usage=pubmed2geneload.sh
 #
 #  Env Vars:
 #
@@ -43,22 +42,29 @@
 #
 
 cd `dirname $0`
-LOG=`pwd`/pubmed2geneload.log
-rm -rf ${LOG}
 
 CONFIG_LOAD=../pubmed2geneload.config
 
-#
-# verify & source the configuration file
-#
+USAGE='Usage: pubmed2geneload.sh"
 
-if [ ! -r ${CONFIG_LOAD} ]
+#
+# Make sure the common configuration file exists and source it. 
+#
+if [ -f ${COMMON_CONFIG} ]
 then
-    echo "Cannot read configuration file: ${CONFIG_LOAD}"
+    . ${COMMON_CONFIG}
+else
+    echo "Missing configuration file: ${COMMON_CONFIG}"
     exit 1
 fi
 
-. ${CONFIG_LOAD}
+#
+# Initialize the log file.
+# open LOG in append mode and redirect stdout
+#
+LOG=${LOG_FILE}
+rm -rf ${LOG}
+>>${LOG}
 
 #
 #  Source the DLA library functions.
@@ -77,6 +83,7 @@ else
     echo "Environment variable DLAJOBSTREAMFUNC has not been defined." | tee -a ${LOG}
     exit 1
 fi
+
 echo ${MGD_DBSERVER}
 echo ${MGD_DBNAME}
 
@@ -94,8 +101,8 @@ preload ${OUTPUTDIR}
 #
 # Create associations in the database
 #
-echo "Creating PubMed to Gene Associations" >> ${LOG_DIAG}
-${PYTHON} ${PUBMED2GENELOAD}/bin/pubmed2geneload.py >> ${LOG_DIAG}
+echo "Creating PubMed to Gene Associations" >> ${LOG_DIAG} 2>&1
+${PYTHON} ${PUBMED2GENELOAD}/bin/pubmed2geneload.py >> ${LOG_DIAG} 2>&1
 STAT=$?
 checkStatus ${STAT} "pubmed2geneload.py"
 

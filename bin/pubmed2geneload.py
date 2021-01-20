@@ -326,7 +326,7 @@ def updateGoStatus():
 
         batchToRun = ','.join(assocStatusRefList[0:UPDATE_BATCH])
         print(batchToRun)
-        checkGoStatus(batchToRun, 'before')
+        checkGoStatus(batchToRun)
         del assocStatusRefList[0:UPDATE_BATCH]
 
         print('%s' % mgi_utils.date())
@@ -340,23 +340,23 @@ def updateGoStatus():
         returnCode = result.returncode
 
         print('after subprocess stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
-        checkGoStatus(batchToRun, 'after')
+        checkGoStatus(batchToRun)
 
         if returnCode != 0:
             return 1
 
     return 0
 
-def checkGoStatus(batchToRun, mode):
+def checkGoStatus(batchToRun):
 
     testbatchToRun = batchToRun.replace(",MGI:", "',MGI:")
     testbatchToRun = testbatchToRun.replace("MGI:", "'MGI:")
     testbatchToRun += "'"
 
-    if mode == 'before':
-       statusSQL = 'and s._Status_key in (31576669, 31576670, 31576671, 71027551)'
-    else:
-       statusSQL = 'and s._Status_key in (31576673)'
+    #if mode == 'before':
+    #   statusSQL = 'and s._Status_key in (31576669, 31576670, 31576671, 71027551)'
+    #else:
+    #   statusSQL = 'and s._Status_key in (31576673)'
 
     results = db.sql('''
         select c._refs_key, c.mgiID, c.jnumid, c.pubmedid, t.term as relvance, t2.term as status,
@@ -372,13 +372,12 @@ def checkGoStatus(batchToRun, mode):
         and r._refs_key = s._refs_key
         and s.isCurrent = 1
         and s._Group_key = 31576666
-        %s
         and s._status_key = t2._term_key
         and s._group_key = t3._term_key
         and s._createdby_key = u2._user_key
         and c.mgiid in (%s)
         order by c.short_citation, t3.term
-        ''' % (statusSQL, testbatchToRun), 'auto')
+        ''' % (testbatchToRun), 'auto')
     for r in results:
         print(r)
 
