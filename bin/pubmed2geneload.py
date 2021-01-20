@@ -172,7 +172,7 @@ def init():
     db.sql('create index egidx1 on egMultiples(egid)', None)
 
     #
-    # GO status = New, Not Routed, Routed, Chosen
+    # GO status = Not Routed, Routed, Chosen
     # Relevance = keep
     # Is Reviewed = 0
     # used to update GO status when refs associated with genes
@@ -185,7 +185,7 @@ def init():
         and c.isreviewarticle = 0
         and s._Group_key = 31576666
         and s.isCurrent = 1
-        and s._Status_key in (31576669, 31576670, 31576671, 71027551)
+        and s._Status_key in (31576670, 31576671, 71027551)
         and s._Refs_key = v._Refs_key
         and v._Relevance_key = 70594667
         ''', 'auto')
@@ -316,8 +316,7 @@ def updateGoStatus():
 
     # for all reference associations we are creating:
     #       change status = Indexed
-    #       generate jnum, if necessary
-    # using Java API
+    #       java api will generate jnum, if necessary
 
     # get list of refids that actually need updating, reporting as we go
     print('updateGoStatus size of assocStatusRefList: %s' % len(assocStatusRefList))
@@ -352,11 +351,6 @@ def checkGoStatus(batchToRun):
     testbatchToRun = batchToRun.replace(",MGI:", "',MGI:")
     testbatchToRun = testbatchToRun.replace("MGI:", "'MGI:")
     testbatchToRun += "'"
-
-    #if mode == 'before':
-    #   statusSQL = 'and s._Status_key in (31576669, 31576670, 31576671, 71027551)'
-    #else:
-    #   statusSQL = 'and s._Status_key in (31576673)'
 
     results = db.sql('''
         select c._refs_key, c.mgiID, c.jnumid, c.pubmedid, t.term as relvance, t2.term as status,
