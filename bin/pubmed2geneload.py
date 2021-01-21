@@ -235,20 +235,20 @@ def createBCP():
         refid = r['mgiid']
         jnumid = r['jnumid']
 
-        # if jnum exists
+        # if jnum exists, add to reference/marker assoc
         if jnumid != None:
                 addToBcp = 1
 
-        # if GO/Status rules are met then 
-        #       addToBcp 
+        # if GO/Status rules are met
+        #       add association to reference/marker
         #       add to GO/Status
         if refid in dbStatusRefList:
                 addToBcp = 1
                 assocStatusRefList.append(refid)
 
-        # add association to reference/marker
+        # if jnum exists, add to reference/marker assoc
         # or
-        # GO/Status rules are met
+        # if GO/Status rules are met
         if addToBcp == 1:
 
                 fpBcp.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
