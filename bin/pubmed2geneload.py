@@ -186,7 +186,7 @@ def init():
         and c.isreviewarticle = 0
         and s._Group_key = 31576666
         and s.isCurrent = 1
-        and s._Status_key in (31576670, 31576671, 71027551)
+        and s._Status_key in (71027551, 31576670, 31576671, 71027551)
         and s._Refs_key = v._Refs_key
         and v._Relevance_key = 70594667
         ''', 'auto')
