@@ -43,9 +43,9 @@
 
 cd `dirname $0`
 
-CONFIG_LOAD=../pubmed2geneload.config
+COMMON_CONFIG=../pubmed2geneload.config
 
-USAGE='Usage: pubmed2geneload.sh"
+USAGE="Usage: pubmed2geneload.sh"
 
 #
 # Make sure the common configuration file exists and source it. 

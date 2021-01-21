@@ -35,7 +35,7 @@
 # History
 #
 #       01/20/2021      lec
-#       - TR13349/B39
+#       - TR13349/Genome Build 39 project
 #
 #	2/9/2018	sc
 #	- TR12760 - create marker/reference associations and update GO status
@@ -87,6 +87,7 @@ totalDeleted = 0
 
 # references in db that allow status = Indexed updates
 dbStatusRefList = []
+
 # references from associations that allow status = Indexed updates
 assocStatusRefList = []
 
@@ -216,7 +217,6 @@ def createBCP():
         and a._LogicalDB_key = 55
         and a.preferred = 1
         and d.pubmedid = c.pubmedid
-        and c.jnumid is not null
         and not exists (select 1 from currentAssocs c
                 where d.pubmedid = c.pubmedid
                 and d.geneid = c.geneid
