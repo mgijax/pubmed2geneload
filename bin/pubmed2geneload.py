@@ -209,7 +209,7 @@ def createBCP():
     global assocStatusRefList
 
     results = db.sql('''
-        select distinct d.geneid, d.pubmedid, a._Object_key as _marker_key, c._refs_key, c.mgiid
+        select distinct d.geneid, d.pubmedid, a._Object_key as _marker_key, c._refs_key, c.mgiid, c.jnumid
         from DP_EntrezGene_PubMed d, ACC_Accession a, BIB_Citation_Cache c
         where d.taxid = 10090
         and d.geneid = a.accid
@@ -227,19 +227,32 @@ def createBCP():
 
     for r in results:
 
+        addToBcp = 0
+
         pmID = r['pubmedid']
         markerKey = r['_marker_key']
         refKey = r['_refs_key']
         refid = r['mgiid']
+        jnumid = r['jnumid']
 
-        # reference/GO/status will be set = Indexed
+        # jnum exists
+        if jnumid != None:
+                addToBcp = 1
+
+        # GO/Status rules are met
         if refid in dbStatusRefList:
+                addToBcp = 1
+
+        # add association to reference/marker
+        # set GO/Status = Indexed
+        if addToBcp == 1:
+
+                fpBcp.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
+                        (refAssocKey, refKey, markerKey, mgiTypeKey, refAssocTypeKey,  createdByKey, createdByKey, loaddate, loaddate))
+
                 assocStatusRefList.append(refid)
 
-        fpBcp.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
-                   (refAssocKey, refKey, markerKey, mgiTypeKey, refAssocTypeKey,  createdByKey, createdByKey, loaddate, loaddate))
-
-        refAssocKey = refAssocKey + 1
+                refAssocKey = refAssocKey + 1
 
     return 0
 
