@@ -240,7 +240,7 @@ def createBCP():
                 addToBcp = 1
 
         # if GO/Status rules are met
-        #       add association to reference/marker
+        #       add to reference/marker assoc
         #       add to GO/Status
         if refid in dbStatusRefList:
                 addToBcp = 1
@@ -340,7 +340,6 @@ def updateGoStatus():
 
         batchToRun = ','.join(assocStatusRefList[0:UPDATE_BATCH])
         print(batchToRun)
-        checkGoStatus(batchToRun)
         del assocStatusRefList[0:UPDATE_BATCH]
 
         print('%s' % mgi_utils.date())
