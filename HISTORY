@@ -1,3 +1,10 @@
+TAG: pubmed2geneload-6-0-20-1
+DATE: 05/31/2022
+STAFF: lec
+cream 2022/6.20 release
+wts2-856/api/lit triage/merge LT & Reference model
+STATUS_URL = 'littriage/statusUpdate...' -> STATUS_URL = 'reference/statusUpdate...'
+
 TAG: pubmed2geneload-6-0-17-1
 DATE: 05/11/2021
 STAFF: lec
