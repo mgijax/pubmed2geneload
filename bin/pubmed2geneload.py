@@ -173,7 +173,7 @@ def init():
     db.sql('create index egidx1 on egMultiples(egid)', None)
 
     #
-    # GO status = Not Routed, Routed, Chosen
+    # GO status = New, Not Routed, Routed, Chosen
     # Relevance = keep
     # Is Reviewed = 0
     # used to update GO status when refs associated with genes
@@ -186,7 +186,7 @@ def init():
         and c.isreviewarticle = 0
         and s._Group_key = 31576666
         and s.isCurrent = 1
-        and s._Status_key in (71027551, 31576670, 31576671, 71027551)
+        and s._Status_key in (31576669, 31576670, 31576671, 71027551)
         and s._Refs_key = v._Refs_key
         and v._Relevance_key = 70594667
         ''', 'auto')
@@ -197,8 +197,7 @@ def init():
     return 0
 
 #
-# Purpose: create reference association bcp file, writes discrepancies
-#	to data structures by type
+# Purpose: create reference association bcp file, writes discrepancies to data structures by type
 # Returns: 0
 # Assumes: input/output files exist and have been opened
 # Effects: writes to the file system
