@@ -199,7 +199,7 @@ def createBCP():
         and a._LogicalDB_key = 55
         and a.preferred = 1
         and d.pubmedid = c.pubmedid
-        and d.jnum is not null
+        and c.jnum is not null
         and not exists (select 1 from currentAssocs c
                 where d.pubmedid = c.pubmedid
                 and d.geneid = c.geneid
