@@ -98,7 +98,7 @@ def init():
     #
     # reference/pubmedid/geneid associations that already exist in MGI
     #   
-    print('getting reference/pubmedid/geneid associations that already exist in MGI; ignore jnumid')
+    print('getting reference/pubmedid/geneid associations that already exist in MGI')
     db.sql('''
         select c._refs_key, c.pubmedid, a.accid as geneid
         into temporary table currentAssocs
