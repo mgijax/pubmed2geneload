@@ -98,12 +98,13 @@ def init():
     #
     # reference/pubmedid/geneid associations that already exist in MGI
     #   
-    print('getting reference/pubmedid/geneid associations that already exist in MGI')
+    print('getting reference/pubmedid/geneid associations that already exist in MGI; ignore jnumid')
     db.sql('''
         select c._refs_key, c.pubmedid, a.accid as geneid
         into temporary table currentAssocs
         from MGI_Reference_Assoc ra, BIB_Citation_Cache c, ACC_Accession a
                 where c.pubmedid is not null
+                and c.jnumid is not null
                 and c._refs_key = ra._refs_key
                 and ra._MGIType_key = 2
                 and ra._refassoctype_key = 1018
@@ -163,8 +164,9 @@ def init():
     results = db.sql('''
         select c.mgiid
         from BIB_Citation_Cache c, BIB_Workflow_Status s, BIB_Workflow_Relevance v
-        where c._Refs_key = s._Refs_key
+        where c.jnumid is not null
         and c.isreviewarticle = 0
+        and c._Refs_key = s._Refs_key
         and s._Group_key = 31576666
         and s.isCurrent = 1
         and s._Status_key in (31576669, 31576670, 31576671, 71027551)
@@ -197,6 +199,7 @@ def createBCP():
         and a._LogicalDB_key = 55
         and a.preferred = 1
         and d.pubmedid = c.pubmedid
+        and d.jnum is not null
         and not exists (select 1 from currentAssocs c
                 where d.pubmedid = c.pubmedid
                 and d.geneid = c.geneid
@@ -207,37 +210,26 @@ def createBCP():
 
     for r in results:
 
-        addToBcp = 0
-
         pmID = r['pubmedid']
         markerKey = r['_marker_key']
         refKey = r['_refs_key']
         refid = r['mgiid']
         jnumid = r['jnumid']
 
-        # if jnum exists, add to reference/marker assoc
-        if jnumid != None:
-                addToBcp = 1
-
         # if GO/Status rules are met
         #       add to reference/marker assoc
         #       add to GO/Status
         if refid in statusToDoList:
                 if refid not in statusDoneList:
-                        addToBcp = 1
                         updateStatusSQL += 'update BIB_Workflow_Status set iscurrent = 0 where _refs_key = %s and _group_key = 31576666 and _status_key in (31576669, 31576670, 31576671, 71027551) and iscurrent = 1;\n' % (refKey)
                         fpStatus.write('%s|%s|31576666|31576673|1|%s|%s|%s|%s\n' % \
                                 (statusKey, refKey, createdByKey, createdByKey, loaddate, loaddate))
                         statusKey = statusKey + 1
                         statusDoneList.append(refid)
 
-        # if jnum exists, add to reference/marker assoc
-        # or
-        # if GO/Status rules are met
-        if addToBcp == 1:
-                fpRef.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
-                        (refAssocKey, refKey, markerKey, mgiTypeKey, refAssocTypeKey,  createdByKey, createdByKey, loaddate, loaddate))
-                refAssocKey = refAssocKey + 1
+        fpRef.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
+                (refAssocKey, refKey, markerKey, mgiTypeKey, refAssocTypeKey,  createdByKey, createdByKey, loaddate, loaddate))
+        refAssocKey = refAssocKey + 1
 
     return 0
 
