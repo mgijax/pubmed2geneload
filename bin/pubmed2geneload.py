@@ -9,11 +9,12 @@
 # Env Vars:
 #	 1. OUTPUTDIR - where to write the bcp file
 #	 2. LOG_DIAG - diagnostic log 
-#	 3. BCP_FILE -  full path to the bcp file
-#	 4. PG_DBUTILS - for the bcp utility script
-#	 5. JAVA_API_URL - access to the java api for status updates
-#	 6. JAVA_API_TOKEN - security token for java api updates
-#	 7. UPDATE_BATCH - size of the status update batches
+#	 3. BCPREF_FILE -  full path to the bcp file
+#	 4. BCPSTATUS_FILE -  full path to the bcp file
+#	 5. PG_DBUTILS - for the bcp utility script
+#	 6. JAVA_API_URL - access to the java api for status updates
+#	 7. JAVA_API_TOKEN - security token for java api updates
+#	 8. UPDATE_BATCH - size of the status update batches
 #
 # Inputs:
 #	1. RADAR database DP_EntrezGene_PubMed table
@@ -50,24 +51,21 @@ import loadlib
 import subprocess
         
 db.setTrace(True)
-
 DEBUG = 0	 # if 0, not in debug mode
-bcpon = 1        # bcp into the database?  default is yes.
 
 # for creating API URL to update status
-PUT = 'curl -X PUT "'
-JAVA_API_URL = os.environ['JAVA_API_URL']
-JAVA_API_TOKEN = os.environ['JAVA_API_TOKEN']
-STATUS_URL = 'reference/statusUpdate?accid=%s&group=GO&status=Indexed" -H "accept: application/json" -H  "api_access_token: ' + JAVA_API_TOKEN + '" -H  "username: pm2geneload"'
-
+#PUT = 'curl -X PUT "'
+#JAVA_API_URL = os.environ['JAVA_API_URL']
+#JAVA_API_TOKEN = os.environ['JAVA_API_TOKEN']
+#STATUS_URL = 'reference/statusUpdate?accid=%s&group=GO&status=Indexed" -H "accept: application/json" -H  "api_access_token: ' + JAVA_API_TOKEN + '" -H  "username: pm2geneload"'
 # the full URL - just plug in comma delim (no space) list of reference MGI ID
-FULL_API_URL = PUT + JAVA_API_URL + STATUS_URL
-
+#FULL_API_URL = PUT + JAVA_API_URL + STATUS_URL
 # max number of status updates in a batch
-UPDATE_BATCH = int(os.environ['UPDATE_BATCH'])
+#UPDATE_BATCH = int(os.environ['UPDATE_BATCH'])
 
-# next available MGI_Reference_Assoc primary key
+# next available MGI_Reference_Assoc, BIB_Workflow_Status primary key
 refAssocKey = None
+statusKey = None
 mgiTypeKey = 2	            # marker
 refAssocTypeKey = 1018      # General
 createdByKey = 1571         # pubmed2geneload
@@ -79,17 +77,21 @@ fpLogDiag = ''
 # bcp stuff
 outputDir = os.environ['OUTPUTDIR']
 refTable = 'MGI_Reference_Assoc'
-bcpFile =  refTable + '.bcp'
-fpBcp = ''
+statusTable = 'BIB_Workflow_Status'
+bcpRefFile =  refTable + '.bcp'
+bcpStatusFile =  statusTable + '.bcp'
+fpRef = ''
+fpStatus = ''
 
 # Total gene/reference associations deleted from db
 totalDeleted = 0
 
 # references in db that allow status = Indexed updates
-dbStatusRefList = []
+statusToDoList = []
+statusDoneList = []
 
-# references from associations that allow status = Indexed updates
-assocStatusRefList = []
+# update existing status iscurrent = 0
+updateStatusSQL = ""
 
 #
 # Purpose: initialize lookups, next primary key, file descriptors
@@ -99,8 +101,8 @@ assocStatusRefList = []
 # Throws: Nothing
 #
 def init():
-    global refAssocKey, fpBcp, fpLogDiag
-    global dbStatusRefList
+    global refAssocKey, statusKey, fpRef, fpStatus, fpLogDiag
+    global statusToDoList
 
     # Log all SQL
     db.set_sqlLogFunction(db.sqlLogAll)
@@ -109,10 +111,14 @@ def init():
     fpLogDiag = open (os.environ['LOG_DIAG'], 'a')
 
     # bcp file
-    fpBcp = open(os.environ['BCP_FILE'], 'w')
+    fpRef = open(os.environ['BCPREF_FILE'], 'w')
+    fpStatus = open(os.environ['BCPSTATUS_FILE'], 'w')
 
     results = db.sql(''' select nextval('mgi_reference_assoc_seq') as maxKey ''', 'auto')
     refAssocKey = results[0]['maxKey']
+
+    results = db.sql(''' select nextval('bib_workflow_status_seq') as maxKey ''', 'auto')
+    statusKey = results[0]['maxKey']
 
     #
     # reference/pubmedid/geneid associations that already exist in MGI
@@ -191,7 +197,7 @@ def init():
         and v._Relevance_key = 70594667
         ''', 'auto')
     for r in results:
-        dbStatusRefList.append(r['mgiid'])
+        statusToDoList.append(r['mgiid'])
 
     sys.stdout.flush()
     return 0
@@ -204,8 +210,8 @@ def init():
 # Throws: Nothing
 #
 def createBCP():
-    global refAssocKey
-    global assocStatusRefList
+    global refAssocKey, statusKey
+    global updateStatusSQL
 
     results = db.sql('''
         select distinct d.geneid, d.pubmedid, a._Object_key as _marker_key, c._refs_key, c.mgiid, c.jnumid
@@ -241,18 +247,21 @@ def createBCP():
         # if GO/Status rules are met
         #       add to reference/marker assoc
         #       add to GO/Status
-        if refid in dbStatusRefList:
-                addToBcp = 1
-                assocStatusRefList.append(refid)
+        if refid in statusToDoList:
+                if refid not in statusDoneList:
+                        addToBcp = 1
+                        updateStatusSQL += 'update BIB_Workflow_Status set iscurrent = 0 where _refs_key = %s and _group_key = 31576666 and _status_key in (31576669, 31576670, 31576671, 71027551) and iscurrent = 1;\n' % (refKey)
+                        fpStatus.write('%s|%s|31576666|31576673|1|%s|%s|%s|%s\n' % \
+                                (statusKey, refKey, createdByKey, createdByKey, loaddate, loaddate))
+                        statusKey = statusKey + 1
+                        statusDoneList.append(refid)
 
         # if jnum exists, add to reference/marker assoc
         # or
         # if GO/Status rules are met
         if addToBcp == 1:
-
-                fpBcp.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
+                fpRef.write('%s|%s|%s|%s|%s|%s|%s|%s|%s\n' % \
                         (refAssocKey, refKey, markerKey, mgiTypeKey, refAssocTypeKey,  createdByKey, createdByKey, loaddate, loaddate))
-
                 refAssocKey = refAssocKey + 1
 
     return 0
@@ -267,10 +276,12 @@ def createBCP():
 def bcpFiles():
     global totalDeleted
 
-    fpBcp.close()
+    fpRef.close()
+    fpStatus.close()
+    #print(updateStatusSQL)
     db.commit()
 
-    if DEBUG or not bcpon:
+    if DEBUG:
         return 0
 
     # delete from MGI_Reference_Assoc
@@ -303,16 +314,26 @@ def bcpFiles():
     bcpCommand = os.environ['PG_DBUTILS'] + '/bin/bcpin.csh'
 
     bcpCmd = '%s %s %s %s %s %s "\|" "\\n" mgd' % \
-        (bcpCommand, db.get_sqlServer(), db.get_sqlDatabase(), refTable, outputDir, bcpFile)
-
+        (bcpCommand, db.get_sqlServer(), db.get_sqlDatabase(), refTable, outputDir, bcpRefFile)
     print(bcpCmd)
     fpLogDiag.write('%s\n' % bcpCmd)
-
     print('executing bcp')
     os.system(bcpCmd)
 
+    bcpCmd = '%s %s %s %s %s %s "\|" "\\n" mgd' % \
+        (bcpCommand, db.get_sqlServer(), db.get_sqlDatabase(), statusTable, outputDir, bcpStatusFile)
+    print(bcpCmd)
+    fpLogDiag.write('%s\n' % bcpCmd)
+    print('executing bcp')
+    os.system(bcpCmd)
+
+    db.sql(updateStatusSQL)
+    db.commit()
+
     # update mgi_reference_assoc auto-sequence
     db.sql(''' select setval('mgi_reference_assoc_seq', (select max(_assoc_key) from MGI_Reference_Assoc)) ''', None)
+    db.commit()
+    db.sql(''' select setval('bib_workflow_status_seq', (select max(_assoc_key) from BIB_Workflow_Status)) ''', None)
     db.commit()
 
     return 0
@@ -396,8 +417,10 @@ def checkGoStatus(batchToRun):
 # Throws: Nothing
 #
 def closeFiles():
-    if fpBcp:
-        fpBcp.close()
+    if fpRef:
+        fpRef.close()
+    if fpStatus:
+        fpStatus.close()
     if fpLogDiag:
         fpLogDiag.close()
     return 0
@@ -430,13 +453,13 @@ if bcpFiles() != 0:
     closeFiles()
     sys.exit(1)
 
-print('%s' % mgi_utils.date())
-print('running updateGoStatus')
-sys.stdout.flush()
-if updateGoStatus()  != 0:
-    print('Status updates failed')
-    closeFiles()
-    sys.exit(1)
+#print('%s' % mgi_utils.date())
+#print('running updateGoStatus')
+#sys.stdout.flush()
+#if updateGoStatus()  != 0:
+#    print('Status updates failed')
+#    closeFiles()
+#    sys.exit(1)
 
 closeFiles()
 

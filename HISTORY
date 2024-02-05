@@ -1,10 +1,11 @@
 TAG: pubmed2geneload-6-0-23-1
-DATE: 02/02/2024
+DATE: 02/05/2024
 STAFF: lec
 wts2-1387/fl2-726/Not Routed bug
 189         and s._Status_key in (71027551, 31576670, 31576671, 71027551)
 should be:
 189         and s._Status_key in (31576669, 31576670, 31576671, 71027551)
+also changed 
 
 TAG: pubmed2geneload-6-0-20-2
 DATE: 10/03/2022
