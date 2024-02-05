@@ -12,9 +12,6 @@
 #	 3. BCPREF_FILE -  full path to the bcp file
 #	 4. BCPSTATUS_FILE -  full path to the bcp file
 #	 5. PG_DBUTILS - for the bcp utility script
-#	 6. JAVA_API_URL - access to the java api for status updates
-#	 7. JAVA_API_TOKEN - security token for java api updates
-#	 8. UPDATE_BATCH - size of the status update batches
 #
 # Inputs:
 #	1. RADAR database DP_EntrezGene_PubMed table
@@ -29,18 +26,6 @@
 #      0:  Successful completion
 #      1:  An exception occurred
 #
-#  Assumes:  Nothing
-#
-#  Notes: This script uses the Java API (mgd_java_api) to do status updates
-#
-# History
-#
-#       01/20/2021      lec
-#       - TR13349/Genome Build 39 project
-#
-#	2/9/2018	sc
-#	- TR12760 - create marker/reference associations and update GO status
-#		only if reference has JNumber
 ###########################################################################
 
 import sys
@@ -48,20 +33,9 @@ import os
 import mgi_utils
 import db
 import loadlib
-import subprocess
-        
+       
 db.setTrace(True)
 DEBUG = 0	 # if 0, not in debug mode
-
-# for creating API URL to update status
-#PUT = 'curl -X PUT "'
-#JAVA_API_URL = os.environ['JAVA_API_URL']
-#JAVA_API_TOKEN = os.environ['JAVA_API_TOKEN']
-#STATUS_URL = 'reference/statusUpdate?accid=%s&group=GO&status=Indexed" -H "accept: application/json" -H  "api_access_token: ' + JAVA_API_TOKEN + '" -H  "username: pm2geneload"'
-# the full URL - just plug in comma delim (no space) list of reference MGI ID
-#FULL_API_URL = PUT + JAVA_API_URL + STATUS_URL
-# max number of status updates in a batch
-#UPDATE_BATCH = int(os.environ['UPDATE_BATCH'])
 
 # next available MGI_Reference_Assoc, BIB_Workflow_Status primary key
 refAssocKey = None
@@ -101,7 +75,8 @@ updateStatusSQL = ""
 # Throws: Nothing
 #
 def init():
-    global refAssocKey, statusKey, fpRef, fpStatus, fpLogDiag
+    global refAssocKey, statusKey
+    global fpRef, fpStatus, fpLogDiag
     global statusToDoList
 
     # Log all SQL
@@ -339,77 +314,6 @@ def bcpFiles():
     return 0
 
 #
-# Purpose:  Determines references that need GO status updates; updates them
-#	    in the database using Java API calls
-# Returns:  0 if successful, 1 if update failed
-# Assumes:  assocStatusRefList has been loaded
-# Effects:  Updates GO status in the database
-# Throws:   nothing
-#
-def updateGoStatus():
-    global assocStatusRefList
-
-    # for all reference associations we are creating:
-    #       change status = Indexed
-    #       java api will generate jnum, if necessary
-
-    # get list of refids that actually need updating, reporting as we go
-    print('updateGoStatus size of assocStatusRefList: %s' % len(assocStatusRefList))
-
-    while assocStatusRefList != []:
-
-        batchToRun = ','.join(assocStatusRefList[0:UPDATE_BATCH])
-        print(batchToRun)
-        del assocStatusRefList[0:UPDATE_BATCH]
-
-        print('%s' % mgi_utils.date())
-        print('running subprocess')
-        print(FULL_API_URL % batchToRun)
-
-        cmd = FULL_API_URL % batchToRun
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        stdout = result.stdout
-        stderr = result.stderr
-        returnCode = result.returncode
-
-        print('after subprocess stdout: %s stderr: %s returnCode: %s' % (stdout, stderr, returnCode))
-        checkGoStatus(batchToRun)
-
-        if returnCode != 0:
-            return 1
-
-    return 0
-
-def checkGoStatus(batchToRun):
-
-    testbatchToRun = batchToRun.replace(",MGI:", "',MGI:")
-    testbatchToRun = testbatchToRun.replace("MGI:", "'MGI:")
-    testbatchToRun += "'"
-
-    results = db.sql('''
-        select c._refs_key, c.mgiID, c.jnumid, c.pubmedid, t.term as relvance, t2.term as status,
-        u.login as relevanceuser, u2.login as littriageuser, c.short_citation
-        from bib_citation_cache c, bib_refs r, bib_workflow_relevance v, voc_term t, mgi_user u,
-                bib_workflow_status s, voc_term t2, voc_term t3, mgi_user u2
-        where r._refs_key = c._refs_key
-        and r._refs_key = v._refs_key
-        and v.isCurrent = 1
-        and v._relevance_key = 70594667
-        and v._relevance_key = t._term_key
-        and v._createdby_key = u._user_key
-        and r._refs_key = s._refs_key
-        and s.isCurrent = 1
-        and s._Group_key = 31576666
-        and s._status_key = t2._term_key
-        and s._group_key = t3._term_key
-        and s._createdby_key = u2._user_key
-        and c.mgiid in (%s)
-        order by c.short_citation, t3.term
-        ''' % (testbatchToRun), 'auto')
-    for r in results:
-        print(r)
-
-#
 # Purpose: Close files.
 # Returns: 0
 # Assumes: Nothing
@@ -453,15 +357,7 @@ if bcpFiles() != 0:
     closeFiles()
     sys.exit(1)
 
-#print('%s' % mgi_utils.date())
-#print('running updateGoStatus')
-#sys.stdout.flush()
-#if updateGoStatus()  != 0:
-#    print('Status updates failed')
-#    closeFiles()
-#    sys.exit(1)
-
 closeFiles()
-
 print('%s' % mgi_utils.date())
 sys.exit(0)
+
