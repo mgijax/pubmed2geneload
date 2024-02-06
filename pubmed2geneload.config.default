@@ -54,7 +54,7 @@ export LOG_FILE LOG_PROC LOG_DIAG LOG_CUR LOG_VAL
 BCPREF_FILE=${OUTPUTDIR}/MGI_Reference_Assoc.bcp
 BCPSTATUS_FILE=${OUTPUTDIR}/BIB_Workflow_Status.bcp
 
-export BCPREF_FILE BIBSTATUS_FILE
+export BCPREF_FILE BCPSTATUS_FILE
 
 #  The name of the job stream for the load
 JOBSTREAM=pubmed2geneload
