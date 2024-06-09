@@ -1,3 +1,8 @@
+TAG: pubmed2geneload-6-0-23-4
+DATE: 06/09/2024
+STAFF: lec
+check updateStatusSQL len() > 0
+
 TAG: pubmed2geneload-6-0-23-3
 TAG: pubmed2geneload-6-0-23-2
 TAG: pubmed2geneload-6-0-23-1
