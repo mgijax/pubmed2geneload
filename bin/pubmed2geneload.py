@@ -119,15 +119,15 @@ def init():
     db.sql('create index associdx3 on currentAssocs(geneid)', None)
 
     #
-    # pubmed -> eg group > 15
+    # pubmed -> eg group > 100
     #
-    print('getting pubmed -> eg group > 15')
+    print('getting pubmed -> eg group > 100')
     db.sql('''
         select pubmedid
         into temporary table pmMultiples
         from DP_EntrezGene_PubMed
         where taxid = 10090
-        group by pubmedid having count(*) > 15
+        group by pubmedid having count(*) > 100
         ''', None)
     db.sql('create index pmidx1 on pmMultiples(pubmedid)', None)
         
