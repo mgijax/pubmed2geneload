@@ -1,7 +1,7 @@
 TAG: pubmed2geneload-6-0-29-1
 DATE: 10/06/2026
 STAFF: lec
-wts2-1893/adjustment to pm2geneload; don't add markers to lit triage records with "discard" status
+wts2-1893/adjustment to pm2geneload; do not add markers to lit triage records with discard status
         modified:   bin/pubmed2geneload.py
 
 TAG: pubmed2geneload-6-0-27-1
