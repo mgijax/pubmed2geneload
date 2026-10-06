@@ -171,6 +171,7 @@ def init():
         and s.isCurrent = 1
         and s._Status_key in (31576669, 31576670, 31576671, 71027551)
         and s._Refs_key = v._Refs_key
+        and v.isCurrent = 1
         and v._Relevance_key = 70594667
         ''', 'auto')
     for r in results:
@@ -192,7 +193,7 @@ def createBCP():
 
     results = db.sql('''
         select distinct d.geneid, d.pubmedid, a._Object_key as _marker_key, c._refs_key, c.mgiid, c.jnumid
-        from DP_EntrezGene_PubMed d, ACC_Accession a, BIB_Citation_Cache c
+        from DP_EntrezGene_PubMed d, ACC_Accession a, BIB_Citation_Cache c, BIB_Workflow_Relevance v
         where d.taxid = 10090
         and d.geneid = a.accid
         and a._MGIType_key = 2
@@ -200,6 +201,10 @@ def createBCP():
         and a.preferred = 1
         and d.pubmedid = c.pubmedid
         and c.jnumid is not null
+	and c._Refs_key = v._Refs_key
+        and v.isCurrent = 1
+        and v._Relevance_key = 70594667
+
         and not exists (select 1 from currentAssocs c
                 where d.pubmedid = c.pubmedid
                 and d.geneid = c.geneid
